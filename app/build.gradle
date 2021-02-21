@@ -69,7 +69,6 @@ dependencies {
     }
     implementation 'org.greenrobot:greendao:3.3.0'
     implementation 'com.github.zcweng:switch-button:0.0.3@aar'
-    implementation files('libs/baidumapapi_search_v4_3_1.jar')
     implementation files('libs/BaiduLBS_Android.jar')
 
     implementation 'com.belerweb:pinyin4j:2.5.0'
