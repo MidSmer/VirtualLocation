@@ -1,17 +1,17 @@
 apply plugin: 'com.android.library'
 
 android {
-    compileSdkVersion 25
-    buildToolsVersion '25.0.3'
+    compileSdkVersion 28
+    buildToolsVersion '28.0.3'
 
     defaultConfig {
-        minSdkVersion 14
-        targetSdkVersion 25
+        minSdkVersion 21
+        targetSdkVersion 22
         versionCode 1
         versionName "1.0"
         externalNativeBuild {
             ndkBuild {
-                abiFilters "armeabi-v7a", "x86"
+                abiFilters "arm64-v8a", "x86_64"
             }
         }
     }
@@ -29,10 +29,26 @@ android {
     lintOptions {
         //IJobService need NewApi
         warning 'NewApi','OnClick'
+        checkReleaseBuilds false
+        // Or, if you prefer, you can continue to check for errors in release builds,
+        // but continue the build even when errors are found:
+        abortOnError false
     }
 }
 
 
 dependencies {
-    compile fileTree(include: ['*.jar'], dir: 'libs')
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    api("me.weishu.exposed:exposed-core:0.8.1") {
+        exclude group: 'me.weishu', module: 'free_reflection'
+        exclude group: 'me.weishu', module: 'epic'
+        exclude group: 'me.weishu.exposed', module: 'exposed-xposedapi'
+    }
+    implementation "me.weishu:free_reflection:3.0.1"
+    implementation "me.weishu:epic:0.11.1"
+    implementation "me.weishu.exposed:exposed-xposedapi:0.4.6"
+}
+
+repositories {
+    maven { url 'https://jitpack.io' }
 }

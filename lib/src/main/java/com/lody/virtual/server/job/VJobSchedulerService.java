@@ -3,12 +3,14 @@ package com.lody.virtual.server.job;
 import android.annotation.TargetApi;
 import android.app.job.JobInfo;
 import android.app.job.JobScheduler;
+import android.app.job.JobWorkItem;
 import android.content.ComponentName;
 import android.content.Context;
 import android.os.Build;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.os.PersistableBundle;
+import android.os.RemoteException;
 import android.text.TextUtils;
 
 import com.lody.virtual.client.core.VirtualCore;
@@ -17,7 +19,7 @@ import com.lody.virtual.client.stub.VASettings;
 import com.lody.virtual.helper.utils.Singleton;
 import com.lody.virtual.os.VBinder;
 import com.lody.virtual.os.VEnvironment;
-import com.lody.virtual.server.interfaces.IJobService;
+import com.lody.virtual.server.IJobScheduler;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -33,7 +35,7 @@ import java.util.Map;
  * @author Lody
  */
 @TargetApi(Build.VERSION_CODES.LOLLIPOP)
-public class VJobSchedulerService implements IJobService {
+public class VJobSchedulerService extends IJobScheduler.Stub {
 
     private static final String TAG = VJobScheduler.class.getSimpleName();
 
@@ -178,7 +180,7 @@ public class VJobSchedulerService implements IJobService {
 
 
     @Override
-    public int schedule(JobInfo job) {
+    public int schedule(JobInfo job) throws RemoteException {
         int vuid = VBinder.getCallingUid();
         int id = job.getId();
         ComponentName service = job.getService();
@@ -256,7 +258,7 @@ public class VJobSchedulerService implements IJobService {
     }
 
     @Override
-    public void cancel(int jobId) {
+    public void cancel(int jobId) throws RemoteException {
         int vuid = VBinder.getCallingUid();
         synchronized (mJobStore) {
             boolean changed = false;
@@ -279,7 +281,7 @@ public class VJobSchedulerService implements IJobService {
     }
 
     @Override
-    public void cancelAll() {
+    public void cancelAll() throws RemoteException {
         int vuid = VBinder.getCallingUid();
         synchronized (mJobStore) {
             boolean changed = false;
@@ -302,7 +304,7 @@ public class VJobSchedulerService implements IJobService {
     }
 
     @Override
-    public List<JobInfo> getAllPendingJobs() {
+    public List<JobInfo> getAllPendingJobs() throws RemoteException {
         int vuid = VBinder.getCallingUid();
         List<JobInfo> jobs = mScheduler.getAllPendingJobs();
         synchronized (mJobStore) {
@@ -330,6 +332,16 @@ public class VJobSchedulerService implements IJobService {
             }
         }
         return jobs;
+    }
+
+    @Override
+    public int enqueue(JobInfo job, JobWorkItem work) throws RemoteException {
+        return 0;
+    }
+
+    @Override
+    public JobInfo getPendingJob(int i) throws RemoteException {
+        return null;
     }
 
 

@@ -2,7 +2,9 @@
 // VirtualApp Native Project
 //
 #include <Jni/VAJni.h>
+#include <Substrate/CydiaSubstrate.h>
 #include "VMPatch.h"
+#include "fake_dlfcn.h"
 
 namespace FunctionDef {
     typedef void (*Function_DalvikBridgeFunc)(const void **, void *, const void *, void *);
@@ -243,12 +245,24 @@ void mark() {
     // Do nothing
 };
 
+static size_t getArtMethodAddress(jobject javaMethod, jmethodID methodId) {
+    if (patchEnv.api_level < 30) {
+        return (size_t) methodId;
+    } else {
+        JNIEnv *env = Environment::current();
+        jclass executableClass = env->FindClass("java/lang/reflect/Executable");
+        jfieldID artMethod = env->GetFieldID(executableClass, "artMethod", "J");
+        jlong addr = env->GetLongField(javaMethod, artMethod);
+        return addr;
+    }
+}
 
 void measureNativeOffset(bool isArt) {
 
     jmethodID markMethod = nativeEngineClass->getStaticMethod<void(void)>("nativeMark").getId();
 
-    size_t startAddress = (size_t) markMethod;
+    jobject method = Environment::current()->ToReflectedMethod(nativeEngineClass.get(), markMethod, JNI_TRUE);
+    size_t startAddress = (size_t) getArtMethodAddress(method, markMethod);
     size_t targetAddress = (size_t) mark;
     if (isArt && patchEnv.art_work_around_app_jni_bugs) {
         targetAddress = (size_t) patchEnv.art_work_around_app_jni_bugs;
@@ -292,8 +306,8 @@ inline void replaceGetCallingUid(jboolean isArt) {
 
 inline void
 replaceOpenDexFileMethod(jobject javaMethod, jboolean isArt, int apiLevel) {
-
-    size_t mtd_openDexNative = (size_t) Environment::current()->FromReflectedMethod(javaMethod);
+    jmethodID openDexNative = Environment::current()->FromReflectedMethod(javaMethod);
+    size_t mtd_openDexNative = getArtMethodAddress(javaMethod, openDexNative);
     int nativeFuncOffset = patchEnv.native_offset;
     void **jniFuncPtr = (void **) (mtd_openDexNative + nativeFuncOffset);
 
@@ -319,7 +333,8 @@ replaceCameraNativeSetupMethod(jobject javaMethod, jboolean isArt, int apiLevel)
     if (!javaMethod) {
         return;
     }
-    size_t mtd_cameraNativeSetup = (size_t) Environment::current()->FromReflectedMethod(javaMethod);
+    jmethodID cameraNativeSetup = Environment::current()->FromReflectedMethod(javaMethod);
+    size_t mtd_cameraNativeSetup = getArtMethodAddress(javaMethod, cameraNativeSetup);
     int nativeFuncOffset = patchEnv.native_offset;
     void **jniFuncPtr = (void **) (mtd_cameraNativeSetup + nativeFuncOffset);
 
@@ -356,7 +371,8 @@ replaceAudioRecordNativeCheckPermission(jobject javaMethod, jboolean isArt, int 
         return;
     }
     jmethodID methodStruct = Environment::current()->FromReflectedMethod(javaMethod);
-    void **funPtr = (void **) (reinterpret_cast<size_t>(methodStruct) + patchEnv.native_offset);
+    size_t mtd_methodStruct = getArtMethodAddress(javaMethod, methodStruct);
+    void **funPtr = (void **) (mtd_methodStruct + patchEnv.native_offset);
     patchEnv.orig_audioRecordNativeCheckPermission = (Function_audioRecordNativeCheckPermission) (*funPtr);
     *funPtr = (void *) new_native_audioRecordNativeCheckPermission;
 }
@@ -425,7 +441,11 @@ void hookAndroidVM(JArrayClass<jobject> javaMethods,
         }
     }
     measureNativeOffset(isArt);
-    replaceGetCallingUid(isArt);
+    // Crash on Q if hook directly by modify entrypoint of function.
+    // Just skip this step on Q and get never crash
+    if(apiLevel <= 28)
+        replaceGetCallingUid(isArt);
+
     replaceOpenDexFileMethod(javaMethods.getElement(OPEN_DEX).get(), isArt,
                              apiLevel);
     replaceCameraNativeSetupMethod(javaMethods.getElement(CAMERA_SETUP).get(),
@@ -433,6 +453,50 @@ void hookAndroidVM(JArrayClass<jobject> javaMethods,
     replaceAudioRecordNativeCheckPermission(javaMethods.getElement(
             AUDIO_NATIVE_CHECK_PERMISSION).get(),
                                             isArt, apiLevel);
+}
+
+bool processNothing(void* thiz, void* new_methods){ return true; }
+bool (*orig_ProcessProfilingInfo)(void*, void*);
+
+bool compileNothing(void* thiz, void* thread, void* method, bool osr) { return false; }
+bool (*orig_CompileNothing)(void* thiz, void* thread, void* method, bool osr);
+
+void (*org_notifyJitActivity)(void *);
+void notifyNothing(void *thiz) {
+    return;
+}
+
+void disableJit(int apiLevel) {
+#ifdef __arm__
+    void *libart = fake_dlopen("/system/lib/libart.so", RTLD_NOW);
+    if (libart) {
+        // disable profile.
+        void *processProfilingInfo = NULL;
+        const char *processProfileInfoFunc =
+                apiLevel < 26 ? "_ZN3art12ProfileSaver20ProcessProfilingInfoEPt" :
+                "_ZN3art12ProfileSaver20ProcessProfilingInfoEbPt";
+        processProfilingInfo = fake_dlsym(libart, processProfileInfoFunc);
+        ALOGE("processProfileingInfo: %p", processProfilingInfo);
+        if (processProfilingInfo) {
+            MSHookFunction(processProfilingInfo, (void*)processNothing, (void**)&orig_ProcessProfilingInfo);
+        }
+
+        // disable jit
+        void *compileMethod = NULL;
+        compileMethod = fake_dlsym(libart,
+                                   "_ZN3art3jit3Jit13CompileMethodEPNS_9ArtMethodEPNS_6ThreadEb");
+        ALOGE("compileMethod: %p", compileMethod);
+        if (compileMethod) {
+            MSHookFunction(compileMethod, (void*) compileNothing, (void**) &orig_CompileNothing);
+        }
+
+        void *notifyJitActivity = fake_dlsym(libart, "_ZN3art12ProfileSaver17NotifyJitActivityEv");
+        if (notifyJitActivity) {
+            MSHookFunction(notifyJitActivity, (void *) notifyNothing,
+                          (void **) &org_notifyJitActivity);
+        }
+    }
+#endif
 }
 
 void *getDvmOrArtSOHandle() {

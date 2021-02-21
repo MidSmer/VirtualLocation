@@ -25,6 +25,7 @@ import mirror.android.content.pm.PackageParserLollipop;
 import mirror.android.content.pm.PackageParserLollipop22;
 import mirror.android.content.pm.PackageParserMarshmallow;
 import mirror.android.content.pm.PackageParserNougat;
+import mirror.android.content.pm.PackageParserP28;
 import mirror.android.content.pm.PackageUserState;
 
 import static android.os.Build.VERSION_CODES.JELLY_BEAN;
@@ -63,6 +64,10 @@ public class PackageParserCompat {
     }
 
     public static Package parsePackage(PackageParser parser, File packageFile, int flags) throws Throwable {
+        if (BuildCompat.isQ()) {
+            PackageParserP28.setCallback.call(parser, PackageParserP28.CallbackImpl.ctor.newInstance(VirtualCore.getPM()));
+        }
+
         if (API_LEVEL >= M) {
             return PackageParserMarshmallow.parsePackage.callWithException(parser, packageFile, flags);
         } else if (API_LEVEL >= LOLLIPOP_MR1) {
@@ -170,7 +175,9 @@ public class PackageParserCompat {
     }
 
     public static void collectCertificates(PackageParser parser, Package p, int flags) throws Throwable {
-        if (API_LEVEL >= N) {
+        if (API_LEVEL >= 28) {
+            PackageParserP28.collectCertificates.callWithException(p, true);
+        } else if (API_LEVEL >= N) {
             PackageParserNougat.collectCertificates.callWithException(p, flags);
         } else if (API_LEVEL >= M) {
             PackageParserMarshmallow.collectCertificates.callWithException(parser, p, flags);

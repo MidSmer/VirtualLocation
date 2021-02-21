@@ -22,8 +22,6 @@ public class VLocation implements Parcelable {
     public float accuracy = 0.0f;
     public float speed;
     public float bearing;
-    public String address;
-    public String city;
 
     @Override
     public int describeContents() {
@@ -38,8 +36,6 @@ public class VLocation implements Parcelable {
         dest.writeFloat(accuracy);
         dest.writeFloat(speed);
         dest.writeFloat(bearing);
-        dest.writeString(address);
-        dest.writeString(city);
     }
 
     public VLocation() {
@@ -52,8 +48,6 @@ public class VLocation implements Parcelable {
         accuracy = in.readFloat();
         speed = in.readFloat();
         bearing = in.readFloat();
-        address = in.readString();
-        city = in.readString();
     }
 
     public boolean isEmpty() {
@@ -81,8 +75,6 @@ public class VLocation implements Parcelable {
                 ", accuracy=" + accuracy +
                 ", speed=" + speed +
                 ", bearing=" + bearing +
-                ", address=" + address +
-                ", city=" + city +
                 '}';
     }
 

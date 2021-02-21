@@ -1,5 +1,6 @@
 package com.lody.virtual.server.pm.parser;
 
+import android.Manifest;
 import android.content.ComponentName;
 import android.content.IntentFilter;
 import android.content.pm.ActivityInfo;
@@ -13,12 +14,17 @@ import android.content.pm.PermissionInfo;
 import android.content.pm.ProviderInfo;
 import android.content.pm.ServiceInfo;
 import android.content.pm.Signature;
+import android.content.pm.SigningInfo;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Parcel;
 import android.os.Parcelable;
 
+import com.lody.virtual.helper.compat.BuildCompat;
+
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * @author Lody
@@ -61,6 +67,23 @@ public class VPackage implements Parcelable {
     // Applications requested features
     public ArrayList<FeatureInfo> reqFeatures = null;
     public Object mExtras;
+
+    public String[] splitNames;
+    public ArrayList<String> usesOptionalLibraries;
+
+    /**
+     * Path where this package was found on disk. For monolithic packages
+     * this is path to single base APK file; for cluster packages this is
+     * path to the cluster directory.
+     */
+    public String codePath;
+
+    /** Path of base APK */
+    public String baseCodePath;
+    /** Paths of any split APKs, ordered by parsed splitName */
+    public String[] splitCodePaths;
+
+    public SigningInfo signingInfo;
 
     public VPackage() {
     }
@@ -114,6 +137,17 @@ public class VPackage implements Parcelable {
         this.mSharedUserLabel = in.readInt();
         this.configPreferences = in.createTypedArrayList(ConfigurationInfo.CREATOR);
         this.reqFeatures = in.createTypedArrayList(FeatureInfo.CREATOR);
+
+        this.splitNames = in.createStringArray();
+        this.codePath = in.readString();
+        this.baseCodePath = in.readString();
+        this.splitCodePaths = in.createStringArray();
+
+        this.usesOptionalLibraries = in.createStringArrayList();
+
+        if (BuildCompat.isPie()) {
+            this.signingInfo = in.readParcelable(Bundle.class.getClassLoader());
+        }
     }
 
     @Override
@@ -220,6 +254,17 @@ public class VPackage implements Parcelable {
         dest.writeInt(this.mSharedUserLabel);
         dest.writeTypedList(this.configPreferences);
         dest.writeTypedList(this.reqFeatures);
+
+        dest.writeStringArray(this.splitNames);
+        dest.writeString(this.codePath);
+        dest.writeString(this.baseCodePath);
+        dest.writeStringArray(this.splitCodePaths);
+
+        dest.writeStringList(this.usesOptionalLibraries);
+
+        if (BuildCompat.isPie()) {
+            dest.writeParcelable(this.signingInfo, flags);
+        }
     }
 
     public static class ActivityIntentInfo extends IntentInfo {
@@ -449,6 +494,49 @@ public class VPackage implements Parcelable {
     }
 
     public static class PermissionComponent extends Component<IntentInfo> {
+
+        // https://developer.android.com/guide/topics/security/permissions?hl=zh-cn
+        public static Set<String> DANGEROUS_PERMISSION = new HashSet<String>() {{
+            // CALENDAR group
+            add(Manifest.permission.READ_CALENDAR);
+            add(Manifest.permission.WRITE_CALENDAR);
+
+            // CAMERA
+            add(Manifest.permission.CAMERA);
+
+            // CONTACTS
+            add(Manifest.permission.READ_CONTACTS);
+            add(Manifest.permission.WRITE_CONTACTS);
+            add(Manifest.permission.GET_ACCOUNTS);
+
+            // LOCATION
+            add(Manifest.permission.ACCESS_FINE_LOCATION);
+            add(Manifest.permission.ACCESS_COARSE_LOCATION);
+
+            // PHONE
+            add(Manifest.permission.READ_PHONE_STATE);
+            add(Manifest.permission.CALL_PHONE);
+            add(Manifest.permission.READ_CALL_LOG);
+            add(Manifest.permission.WRITE_CALL_LOG);
+            add(Manifest.permission.ADD_VOICEMAIL);
+            add(Manifest.permission.USE_SIP);
+            add(Manifest.permission.PROCESS_OUTGOING_CALLS);
+
+            // SENSORS
+            add(Manifest.permission.BODY_SENSORS);
+
+            // SMS
+            add(Manifest.permission.SEND_SMS);
+            add(Manifest.permission.RECEIVE_SMS);
+            add(Manifest.permission.READ_SMS);
+            add(Manifest.permission.RECEIVE_WAP_PUSH);
+            add(Manifest.permission.RECEIVE_MMS);
+
+            // STORAGE
+            add(Manifest.permission.READ_EXTERNAL_STORAGE);
+            add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+        }};
+
         public PermissionInfo info;
 
         public PermissionComponent(PackageParser.Permission p) {
