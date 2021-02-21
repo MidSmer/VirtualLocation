@@ -203,6 +203,11 @@ public class AppDetailActivity extends BaseAppToolbarActivity implements AppDeta
         public void onAppOpened(String packageName, int userId) throws RemoteException {
             stopProgressDialog();
         }
+
+        @Override
+        public void onOpenFailed(String packageName, int userId) throws RemoteException {
+            stopProgressDialog();
+        }
     };
 
     @Override

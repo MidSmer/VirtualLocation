@@ -71,9 +71,6 @@ public class AppDetailPresenter extends BaseActPresenter<AppDetailView> {
                                     packageName, vCellList);
                         }
 
-                        VirtualLocationManager.get().setAllWifi(Constants.appUserId,
-                                packageName, vWifiList);
-
                         VirtualLocationManager.get().setLocation(Constants.appUserId,
                                 packageName,transferLocation(locInfo));
                         SPUtils.put(baseActivity,packageName,locInfo.getAddrStr());
@@ -115,8 +112,6 @@ public class AppDetailPresenter extends BaseActPresenter<AppDetailView> {
 
         vLocation.latitude = ll.latitude;
         vLocation.longitude = ll.longitude;
-        vLocation.address = locInfo.getAddrStr();
-        vLocation.city = locInfo.getCityName();
 
         return vLocation;
     }
